@@ -5,9 +5,6 @@ date: "2022-12-02"
 output: html_document
 ---
 
-## R Markdown
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 
 ## Loading libraries
@@ -16,8 +13,6 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(patchwork)
 ```
-
-
 
 
 
@@ -51,31 +46,24 @@ docR = 0.02  # Parameter, 1st order decay of DOC
 CtoO2 = 32/12 # Convert C values to DO values
 dt = 1/48     # Model time step (day fraction); 1/48 = 30 minutes; for now, has to be synchronized with 30 min met data
 nSteps = 10500   # Known apriori (number of records in the series)
-LoadData = TRUE 
 ```
 
 
-## (2) Pre-simulation setup
+## (2) Load the data
 ```{r eval=TRUE, echo = TRUE, error=FALSE, warning=FALSE, message=FALSE}
-# (2) Pre-simulation setup
 
 # If you're using Rstudio, change to current directory
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 
-# Only load the data if it hasn't already been loaded, otherwise the code runs slowly
-if (exists('doObs')){
-  LoadData = FALSE
-}
-
-#Load the data
-if (LoadData){
-  doObs = read_tsv("Data/Mendota.doobs") 
+  doObs = read_tsv("Data/Mendota.doobs")
+  doObs$DO[doObs$DO == 0] <- NA # masking suspicious data
+  
   wtr = read_tsv("Data/Mendota.wtr")
   PAR = read_tsv("Data/Mendota.par") %>% mutate(PAR = as.numeric(PAR)) #dataset has non-numeric characters
   
-  ##Now lets plot the data quickly
+  # Now lets plot the data quickly
   p1 = ggplot(doObs) + geom_line(aes(x = dateTime, y = DO)) + ylab('DO (mg/L)')
-  p2 = ggplot(wtr) + geom_line(aes(x = dateTime, y = temp0.5)) + ylab('Water temp 0.5 m (°C)')
+  p2 = ggplot(wtr) + geom_line(aes(x = dateTime, y = temp0.5)) + ylab('Water temp 0.5 m (degC)')
   p3 = ggplot(PAR) + geom_line(aes(x = dateTime, y = PAR)) + ylab('PAR')
   # patchwork plots
   print(p1 / p2 / p3 & theme_bw())
@@ -83,19 +71,46 @@ if (LoadData){
   # Let's join the data, so we have one dataframe
   in.data = doObs %>% left_join(PAR) %>% left_join(wtr)
   
+  print(head(in.data))
+```
+  
+## (3) Make a simple regression model
+```{r eval=TRUE, echo = TRUE, error=FALSE, warning=FALSE, message=FALSE}
   # Plot DO as a function of T, just to show it
   p4 = ggplot(in.data, aes(x = temp0.5, y = DO)) + 
     geom_point(size = 1) +
     geom_smooth(method = 'lm') + 
-    xlab('Water temp 0.5 m (°C)') + ylab('DO (mg/L)') +
+    xlab('Water temp 0.5 m (degC)') + ylab('DO (mg/L)') +
     theme_bw()
   print(p4) # You have to print since these are in a loop 
   
-  #What data do we actually want to use in the model
+```
+
+
+
+## (4) Run the model
+```{r eval=TRUE, echo = TRUE, error=FALSE, warning=FALSE, message=FALSE}
+## Model simulation of epilimnetic lake metabolism for Lake Mendota
+## Observational data from NTL LTER
+
+# O2 Model: dO2/dt = NPP - Rtot + Fatm
+# O2(t) = O2(t-1) + (NPP(t-1) - Rtot(t-1) + Fatm(t-1)) * dt
+
+# Phytoplankton Model: dPhyto/dt = NPP - RPhyto - Settling
+# Phyto(t) = Phyto(t-1) + (NPP(t-1) - RPhyto(t-1) - Settling(t-1)) * dt
+
+# NPP = f(PAR,phosphorus)
+# Rtot = RDOC + RPhyto; RDOC = f(DOC); RPhyto = f(Phyto)
+# Settling = f(zMix,Phyto)
+
+
+
+
+# What data do we actually want to use in the model
   # Create vectors
   wTemp = wtr$temp0.5
   PAR = PAR$PAR
-}
+
 
 # Setup variables to track states and fluxes
 # Initialize values for state variables
@@ -109,13 +124,7 @@ RDOC = NA_real_  # Initialize respiration
 Rphyto = NA_real_  # Initialize respiration
 Rtot = NA_real_  # Initialize respiration
 dosat = NA_real_ # Initialize DO at saturation
-```
 
-
-
-## (3) Run the model
-```{r eval=TRUE, echo = TRUE, error=FALSE, warning=FALSE, message=FALSE}
-# (3) Run the model
 
 # Cycle through the model with 48 time steps per day (i.e., every 30 min)
 for(i in 2:nSteps){
@@ -172,7 +181,7 @@ head(out.model)
 
 
 
-## (4) Plot results
+## (5) Plot results
 ```{r echo = F, fig.cap = 'modelled DO'}
  # There are many ways to do this in ggplot. Ideally you'd want to convert the dataframes from wide to long, but the code below uses the wide format
 
