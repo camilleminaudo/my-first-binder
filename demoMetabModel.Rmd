@@ -1,25 +1,29 @@
-# Load libraries
+---
+title: "metabModel"
+author: "Camille Minaudo"
+date: "2022-12-02"
+output: html_document
+---
+
+## R Markdown
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+## Loading libraries
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(patchwork)
-## GSTP Metabolism Model 2013
-## Edited October 2022 by PC Hanson
-## Model simulation of epilimnetic lake metabolism for Lake Mendota
-## Observational data from NTL LTER
-
-# O2 Model: dO2/dt = NPP - Rtot + Fatm
-# O2(t) = O2(t-1) + (NPP(t-1) - Rtot(t-1) + Fatm(t-1)) * dt
-
-# Phytoplankton Model: dPhyto/dt = NPP - RPhyto - Settling
-# Phyto(t) = Phyto(t-1) + (NPP(t-1) - RPhyto(t-1) - Settling(t-1)) * dt
-
-# NPP = f(PAR,phosphorus)
-# Rtot = RDOC + RPhyto; RDOC = f(DOC); RPhyto = f(Phyto)
-# Settling = f(zMix,Phyto)
+```
 
 
-##################################################
+
+
+
+## (1) Setup constants and parameters
+```{r eval=TRUE, echo = TRUE, error=FALSE, warning=FALSE, message=FALSE}
 # (1) Setup constants and parameters
-
 # These three constants you might normally get from observational data
 phosphorus = 0.050 # Constant value of phosphorus (ug/L)
 DOC = 5.0  # Constant value for dissolved organic carbon (mg/L)
@@ -48,8 +52,11 @@ CtoO2 = 32/12 # Convert C values to DO values
 dt = 1/48     # Model time step (day fraction); 1/48 = 30 minutes; for now, has to be synchronized with 30 min met data
 nSteps = 10500   # Known apriori (number of records in the series)
 LoadData = TRUE 
+```
 
-##################################################
+
+## (2) Pre-simulation setup
+```{r eval=TRUE, echo = TRUE, error=FALSE, warning=FALSE, message=FALSE}
 # (2) Pre-simulation setup
 
 # If you're using Rstudio, change to current directory
@@ -102,8 +109,12 @@ RDOC = NA_real_  # Initialize respiration
 Rphyto = NA_real_  # Initialize respiration
 Rtot = NA_real_  # Initialize respiration
 dosat = NA_real_ # Initialize DO at saturation
+```
 
-##################################################
+
+
+## (3) Run the model
+```{r eval=TRUE, echo = TRUE, error=FALSE, warning=FALSE, message=FALSE}
 # (3) Run the model
 
 # Cycle through the model with 48 time steps per day (i.e., every 30 min)
@@ -154,12 +165,16 @@ out.model = doObs %>% slice(1:nSteps) %>%
          Rphyto = Rphyto, 
          Rtot = Rtot, 
          dosat = dosat)
+# Let's take a look at the modelled data!
+head(out.model)
+
+```
 
 
-##################################################
-# (4) Plot results
-# There are many ways to do this in ggplot. Ideally you'd want to convert the
-# dataframes from wide to long, but the code below uses the wide format
+
+## (4) Plot results
+```{r echo = F, fig.cap = 'modelled DO'}
+ # There are many ways to do this in ggplot. Ideally you'd want to convert the dataframes from wide to long, but the code below uses the wide format
 
 # Plot the predictions
 p5 = ggplot(out.model) +
@@ -206,3 +221,9 @@ p7 = ggplot(out.model %>% slice(-1)) +
 p5 / p6 / p7 + 
   plot_annotation(tag_levels = 'a', tag_suffix = ')') & 
   theme(plot.tag = element_text(size = 8))
+
+
+
+```
+
+
